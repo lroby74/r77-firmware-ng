@@ -36,6 +36,17 @@ is fine.
 > The card is being reformatted; interrupting it leaves it unusable and you will
 > have to write the image again.
 
+### Which microSD card to use
+
+**1 GB minimum, 4-32 GB recommended, from a brand you recognise.** Below 1 GB is
+not supported: the self-expanding step reformats the card and, under 512 MiB,
+produces a filesystem that does not match what this image declares. The tiny
+card supplied with the console is one of those — it boots once, then black
+screen.
+
+A worn card also causes symptoms that look exactly like firmware bugs. If you
+see behaviour nobody else reports, try another card first.
+
 **3. Copy your games.**
 
 Switch off, put the card back in your PC, and copy your ROMs into the `games`
