@@ -15,6 +15,38 @@
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 
+/*
+ * Secondo pulsante di fuoco (Booster Grip / Sega Genesis), aggiunta per la
+ * Retron 77.
+ *
+ * Su un 2600 il secondo pulsante non ha un pin suo: viaggia su una delle due
+ * linee potenziometro della porta, che qui il microcontrollore misura come
+ * valore analogico di paddle. Il valore cambia davvero quando si preme il
+ * tasto (provato su Kaboom!, dove i cesti si spostano), ma finiva
+ * interpretato come movimento della manopola invece che come contatto.
+ *
+ * Con questa manopola accesa, le due linee della porta scelta vengono lette
+ * come un pulsante e generano BTN_1, che Stella mappa gia' su "Fire5", cioe'
+ * il pulsante in piu' di Booster Grip e Genesis:
+ *
+ *     /sys/kernel/atarikey/second_button
+ *         0 = spento (paddle come sempre, predefinito)
+ *         1 = porta 1     2 = porta 2     3 = tutte e due
+ *
+ * Si guardano ENTRAMBE le linee della porta perche' non e' detto che pin 5 e
+ * pin 9 arrivino al microcontrollore nell'ordine che si aspetta Stella, e in
+ * questa modalita' le paddle non servono comunque.
+ *
+ * Da spento non cambia niente: le paddle continuano a funzionare come prima.
+ */
+#define SECOND_BUTTON_LEFT   0x1
+#define SECOND_BUTTON_RIGHT  0x2
+
+static int second_button = 0;
+static int sb_left_state  = 0;
+static int sb_right_state = 0;
+static struct kobject *atarikey_kobj = NULL;
+
 static struct input_dev *atari_dev = NULL;
 struct input_dev *input_left = NULL, *input_right = NULL;
 static struct work_struct atari_gpio_work;
@@ -173,7 +205,16 @@ static void atari_i2c_keys_report_event(struct work_struct *work){
     if(ret == 7){
       // - values: 255 (top) .. 0 (bottom)
       // - bottom visible: ~110 (NTSC), ~80 (PAL)
-      if(g_i2c_key.paddle2 != 0 || g_i2c_key.paddle3 != 0){//Left PaddleA/PaddleB
+      if(second_button & SECOND_BUTTON_LEFT){
+        //porta 1: le linee potenziometro fanno da secondo pulsante
+        int pressed = (g_i2c_key.paddle2 != 0 || g_i2c_key.paddle3 != 0);
+        if(pressed != sb_left_state){
+          sb_left_state = pressed;
+          input_event(input_left, EV_KEY, BTN_1, pressed);
+          input_sync(input_left);
+        }
+      }
+      else if(g_i2c_key.paddle2 != 0 || g_i2c_key.paddle3 != 0){//Left PaddleA/PaddleB
         if((g_i2c_key.paddle2 != 0)){//Left PaddleA
           cur_paddle2 = g_i2c_key.paddle2 - paddle_mid_value;
           //if(abs(cur_paddle2 - old_i2c_key_paddle2) > noise_value){ // TODO: better anti-jitter code
@@ -270,7 +311,16 @@ static void atari_i2c_keys_report_event(struct work_struct *work){
         }
       }
 
-      if(g_i2c_key.paddle0 != 0 || g_i2c_key.paddle1 != 0){//Right PaddleA/PaddleB
+      if(second_button & SECOND_BUTTON_RIGHT){
+        //porta 2: le linee potenziometro fanno da secondo pulsante
+        int pressed = (g_i2c_key.paddle0 != 0 || g_i2c_key.paddle1 != 0);
+        if(pressed != sb_right_state){
+          sb_right_state = pressed;
+          input_event(input_right, EV_KEY, BTN_1, pressed);
+          input_sync(input_right);
+        }
+      }
+      else if(g_i2c_key.paddle0 != 0 || g_i2c_key.paddle1 != 0){//Right PaddleA/PaddleB
         if((g_i2c_key.paddle0 != 0)){//Right PaddleA
           cur_paddle0 = g_i2c_key.paddle0 - paddle_mid_value;
           //if(abs(cur_paddle0 - old_i2c_key_paddle0) > noise_value){
@@ -372,6 +422,60 @@ static void atari_i2c_keys_report_event(struct work_struct *work){
   }
   mod_timer( &atari_i2c_timer, (jiffies) + 1);
 }
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Manopola del secondo pulsante (aggiunta locale, vedi in cima al file)
+static ssize_t second_button_show(struct kobject *kobj,
+                                  struct kobj_attribute *attr, char *buf)
+{
+  return sprintf(buf, "%d\n", second_button);
+}
+
+static ssize_t second_button_store(struct kobject *kobj,
+                                   struct kobj_attribute *attr,
+                                   const char *buf, size_t count)
+{
+  int value;
+
+  if(sscanf(buf, "%d", &value) != 1)
+    return -EINVAL;
+
+  if(value < 0 || value > 3)
+    return -EINVAL;
+
+  second_button = value;
+
+  /* Uscendo dalla modalita' pulsante il tasto potrebbe restare "premuto":
+     si rilascia esplicitamente, altrimenti il gioco lo vede bloccato. */
+  if(!(second_button & SECOND_BUTTON_LEFT) && sb_left_state){
+    sb_left_state = 0;
+    input_event(input_left, EV_KEY, BTN_1, 0);
+    input_sync(input_left);
+  }
+  if(!(second_button & SECOND_BUTTON_RIGHT) && sb_right_state){
+    sb_right_state = 0;
+    input_event(input_right, EV_KEY, BTN_1, 0);
+    input_sync(input_right);
+  }
+
+  return count;
+}
+
+static struct kobj_attribute second_button_attr =
+  __ATTR(second_button, 0644, second_button_show, second_button_store);
+
+// Lettura grezza di quello che manda il microcontrollore, per capire dal vivo
+// cosa arriva davvero dalle porte: /sys/kernel/atarikey/raw
+static ssize_t atarikey_raw_show(struct kobject *kobj,
+                                 struct kobj_attribute *attr, char *buf)
+{
+  return sprintf(buf, "L=%02x p2=%3d p3=%3d R=%02x p0=%3d p1=%3d\n",
+                 g_i2c_key.left.key,  g_i2c_key.paddle2, g_i2c_key.paddle3,
+                 g_i2c_key.right.key, g_i2c_key.paddle0, g_i2c_key.paddle1);
+}
+
+static struct kobj_attribute atarikey_raw_attr =
+  __ATTR(raw, 0444, atarikey_raw_show, NULL);
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 static int bte_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id){
@@ -508,6 +612,16 @@ static int __init atari_key_init(void){
   err = i2c_add_driver(&bte_i2c_driver);
   if(err < 0) printk("bte_i2c driver failed.\n");
   else printk("bte_i2c driver successed.\n");
+
+  /* Se la manopola non nasce, il driver funziona lo stesso: si perde solo la
+     possibilita' di accendere il secondo pulsante. */
+  atarikey_kobj = kobject_create_and_add("atarikey", kernel_kobj);
+  if(!atarikey_kobj)
+    printk(KERN_ERR "atarikey: /sys/kernel/atarikey non creato\n");
+  else if(sysfs_create_file(atarikey_kobj, &second_button_attr.attr))
+    printk(KERN_ERR "atarikey: /sys/kernel/atarikey/second_button non creato\n");
+  else if(sysfs_create_file(atarikey_kobj, &atarikey_raw_attr.attr))
+    printk(KERN_ERR "atarikey: /sys/kernel/atarikey/raw non creato\n");
 
   printk("atari_init end.\n");
   return 0;

@@ -1,0 +1,9 @@
+La presenza di questo file dice al firmware, al prossimo avvio, di estendere
+la partizione della microSD a tutta la scheda (FAT32, fino a 32 GB).
+
+Il contenuto della scheda viene messo in RAM, la partizione viene rifatta e il
+contenuto riscritto. Finito, questo file sparisce da solo e in sys/ compare
+expand.log con lo spazio risultante.
+
+Per rifarlo (per esempio su una scheda piu' capiente) basta ricreare un file
+chiamato "expand" qui nella radice e togliere sys/.expanded.

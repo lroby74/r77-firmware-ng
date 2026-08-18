@@ -13,6 +13,125 @@ echo /sbin/mdev > /proc/sys/kernel/hotplug
 
 mount -t vfat -o rw,sync,nodev,nosuid /dev/mmcblk0p1 /mnt
 
+# ---------------------------------------------------------------------------
+# Primo avvio: estende la partizione dati a tutta la microSD, in FAT32.
+#
+# Il rootfs e' un initramfs dentro l'uImage, quindi /dev/mmcblk0p1 non e' la
+# radice e si puo' riformattare. Il contenuto (pochi MB) passa dalla RAM.
+# mkfs.vfat di busybox fa sempre e solo FAT32: e' quello che vogliamo.
+#
+# Si fa SOLO se sulla scheda c'e' il file "expand", che viaggia dentro
+# l'immagine nuova e viene cancellato appena finito. Chi si limita a
+# sostituire il uImage su una scheda gia' in uso non si vede riformattare
+# niente: e' una cosa che deve chiedere lui, creando quel file.
+# ---------------------------------------------------------------------------
+EXPAND_MARK="/mnt/sys/.expanded"
+
+# Scrive a tutto schermo. In questo kernel la console testuale sul
+# framebuffer non e' compilata, quindi un echo su /dev/tty1 non si vedrebbe:
+# ci pensa fbmsg, che disegna direttamente. Se manca, si tira dritto in
+# silenzio — un avviso mancato non deve impedire l'espansione.
+avviso() {
+    test -x /usr/bin/fbmsg || return 0
+
+    # Il video puo' diventare pronto un attimo dopo di noi: senza questa
+    # attesa il primo messaggio finirebbe nel vuoto e resterebbe lo schermo
+    # nero. Si aspetta al massimo mezzo secondo, e una volta sola: un avviso
+    # non deve ritardare l'espansione.
+    if test -z "$FB_PRONTO"; then
+        n=0
+        while test ! -e /dev/fb0 && test $n -lt 10; do
+            usleep 50000 2>/dev/null || sleep 1
+            n=$((n + 1))
+        done
+        FB_PRONTO=1
+    fi
+
+    /usr/bin/fbmsg -q "DO NOT TURN OFF THE CONSOLE" "" "$@" 2>/dev/null
+}
+
+# Copia da $1 a $2 mostrando quanti file sono passati. Si usa tar perche'
+# elenca quello che estrae mentre lavora: cosi' il contatore e' vero, non
+# una stima. Ritorna il buon esito della copia.
+copia_con_avviso() {
+    local da="$1" a="$2" titolo="$3" totale="$4"
+
+    ( cd "$da" && tar -cf - . ) | ( cd "$a" && tar -xvf - ) | (
+        n=0
+        while read -r riga; do
+            n=$((n + 1))
+            # una riscrittura ogni 50 file: abbastanza per non sembrare fermo,
+            # senza rallentare la copia disegnando in continuazione
+            if test $((n % 50)) -eq 0; then
+                avviso "$titolo" "$n / $totale"
+            fi
+        done
+        avviso "$titolo" "$totale / $totale"
+    )
+
+    # L'esito della catena di pipe e' quello dell'ultimo anello, cioe' del
+    # contatore: non dice niente sulla copia. Si contano le voci alle due
+    # estremita', che e' una verifica vera invece di un codice di ritorno.
+    test "`find "$da" | wc -l`" -eq "`find "$a" | wc -l`"
+}
+
+expand_sdcard() {
+    local used_kb free_kb
+
+    test -e "$EXPAND_MARK" && return 0
+    test -e /mnt/expand || return 0
+
+    # c'e' spazio da guadagnare? (-n non scrive niente)
+    /usr/bin/expandfs -n /dev/mmcblk0 > /dev/null 2>&1 || return 0
+
+    # il contenuto deve entrare in RAM con il 30% di margine
+    used_kb=`du -sk /mnt | cut -f1`
+    free_kb=`df -k /tmp | tail -1 | awk '{print $4}'`
+    test -n "$used_kb" -a -n "$free_kb" || return 0
+    test $((used_kb * 13 / 10)) -lt "$free_kb" || return 0
+
+    # Da qui in avanti si avvisa a video: il lavoro dura parecchio e prima
+    # si vedeva solo uno schermo nero, che invita a spegnere la console.
+    total=`find /mnt | wc -l`
+
+    avviso "READING FILES" "0 / $total"
+
+    rm -rf /tmp/payload
+    mkdir -p /tmp/payload
+    copia_con_avviso /mnt /tmp/payload "READING FILES" "$total" || \
+        { rm -rf /tmp/payload; return 0; }
+
+    # senza uImage la scheda non riparte piu': meglio non cominciare
+    test -f /tmp/payload/uImage || { rm -rf /tmp/payload; return 0; }
+
+    umount /mnt || { rm -rf /tmp/payload; return 0; }
+
+    avviso "PREPARING THE CARD" "PLEASE WAIT"
+
+    if /usr/bin/expandfs /dev/mmcblk0; then
+        # due tentativi: una formattazione fallita a meta' lascia la
+        # scheda inservibile, e il contenuto ce l'abbiamo ancora in RAM
+        for attempt in 1 2; do
+            /sbin/mkfs.vfat -n RETRON77 /dev/mmcblk0p1 || continue
+            mount -t vfat -o rw,nodev,nosuid /dev/mmcblk0p1 /mnt || continue
+            copia_con_avviso /tmp/payload /mnt "WRITING FILES" "$total"
+            avviso "ALMOST DONE" "DO NOT TURN OFF"
+            sync
+            umount /mnt
+            break
+        done
+    fi
+
+    rm -rf /tmp/payload
+    mount -t vfat -o rw,sync,nodev,nosuid /dev/mmcblk0p1 /mnt
+    mkdir -p /mnt/sys
+    rm -f /mnt/expand
+    echo "espansione eseguita" > "$EXPAND_MARK"
+    df -h /mnt > /mnt/sys/expand.log 2>&1
+}
+
+expand_sdcard
+
 for dir in sys games; do
     test -e /mnt/$dir && test ! -d /mnt/$dir && rm -f /mnt/$dir
     test -d /mnt/$dir || mkdir /mnt/$dir
@@ -23,10 +142,41 @@ LOGFILE="/mnt/sys/diagnostics.log"
 
 test -e /mnt/sys/settings && source /mnt/sys/settings
 
-if test -z "$DONT_OVERCLOCK"; then
-    for i in 0 1 2 3; do
-        echo 1200000 > /sys/devices/system/cpu/cpu$i/cpufreq/scaling_setspeed
-    done
+# Frequenze scelte dal menu "OC settings" di Stella, che le scrive qui dentro.
+# DONT_OVERCLOCK continua a funzionare come sempre: vale quando CPU_FREQ non
+# e' impostata, cosi' chi ha gia' quella riga sulla scheda non si accorge di
+# niente.
+if test -z "$CPU_FREQ"; then
+    if test -z "$DONT_OVERCLOCK"; then
+        CPU_FREQ=1200000
+    else
+        CPU_FREQ=1008000
+    fi
+fi
+
+for i in 0 1 2 3; do
+    echo "$CPU_FREQ" > /sys/devices/system/cpu/cpu$i/cpufreq/scaling_setspeed 2>/dev/null
+done
+
+# La GPU parte a 252 MHz dal driver; si tocca solo se qualcuno l'ha chiesto.
+if test -n "$GPU_FREQ" && test -w /sys/kernel/gpu/freq; then
+    echo "$GPU_FREQ" > /sys/kernel/gpu/freq 2>/dev/null
+fi
+
+# Secondo pulsante di fuoco: NON si applica piu'.
+#
+# Sulle porte della console non puo' funzionare — misurato leggendo quello che
+# il microcontrollore trasmette davvero: il secondo pulsante non arriva mai.
+# In compenso accenderlo SPEGNE LE PADDLE, perche' nel driver le linee del
+# potenziometro diventano un contatto e il ramo delle paddle non viene piu'
+# eseguito. Una riga rimasta nelle impostazioni da una prova di mesi prima
+# bastava a lasciare le paddle morte per sempre, senza piu' un modo per
+# accorgersene dal menu.
+#
+# Quindi si azzera sempre, qualunque cosa dica il file: una funzione che non
+# puo' funzionare non deve poter rompere una che funziona.
+if test -w /sys/kernel/atarikey/second_button; then
+    echo 0 > /sys/kernel/atarikey/second_button 2>/dev/null
 fi
 
 if test -e /mnt/memtest; then
@@ -83,6 +233,32 @@ if test -e /mnt/developer; then
 
     echo >> "$LOGFILE"
     ls -la /dev/tty* >> "$LOGFILE"
+fi
+
+# Binario di prova: se sulla scheda c'e' /mnt/sys/stella-test, si usa quello
+# al posto di quello dentro il uImage. Serve a confrontare compilazioni
+# diverse cambiando un file, invece di rifare il kernel a ogni giro.
+# Si toglie il file dalla scheda e tutto torna come prima.
+#
+# Si copia prima da parte e si sostituisce solo se la copia e' arrivata
+# INTERA: un file troncato al posto di Stella vuol dire schermo nero e
+# console che sembra morta, e capita davvero (una scheda sfilata senza
+# espellerla basta). Meglio ignorarlo e avviare quello di serie.
+if test -f /mnt/sys/stella-test; then
+    if cp /mnt/sys/stella-test /tmp/stella-test 2>/dev/null; then
+        atteso=`wc -c < /mnt/sys/stella-test 2>/dev/null`
+        copiato=`wc -c < /tmp/stella-test 2>/dev/null`
+
+        # deve esistere, essere di dimensione plausibile e combaciare
+        if test -n "$atteso" -a "$atteso" = "$copiato" -a "$atteso" -gt 500000; then
+            cp /tmp/stella-test /usr/bin/stella && chmod 755 /usr/bin/stella
+            echo "binario di prova in uso: $atteso byte" > /mnt/sys/stella-test.log
+        else
+            echo "binario di prova IGNORATO: attesi $atteso byte, copiati $copiato" \
+                > /mnt/sys/stella-test.log
+        fi
+        rm -f /tmp/stella-test
+    fi
 fi
 
 DUMPFILE="/tmp/rom_dump.bin"

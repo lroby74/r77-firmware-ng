@@ -1,0 +1,69 @@
+# Impostazioni della Retron 77, lette all'avvio.
+#
+# Quello che ha il cancelletto davanti NON e' attivo: per accendere una voce
+# si toglie il cancelletto.
+#
+# Le prime tre si cambiano anche dal menu della console, in
+# Basic settings -> OC settings, che riscrive questo file conservando il resto.
+
+# --- Frequenza della CPU, in kHz -------------------------------------------
+# Passi veri: 1200000, 1104000, 1008000, 912000.
+# Fra 1104 e 1200 non c'e' nessun gradino, e sopra 1200 il driver taglia.
+# 912000 e' il gradino a cui scende da sola la protezione termica a 75 gradi.
+#
+# ATTIVA a 1104000: e' il passo provato stabile su questa console. Senza questa
+# riga la console partirebbe a 1200000, che qui si pianta. Chi vuole il
+# comportamento di fabbrica rimette il cancelletto davanti.
+CPU_FREQ=1104000
+
+# --- Frequenza tenuta nei menu, in kHz -------------------------------------
+# Nel lanciatore e nei menu non c'e' niente da emulare, quindi la CPU scende e
+# risale appena parte il gioco: la riga qui sopra resta quella del gioco.
+# Il pavimento e' 480000, imposto dallo script.bin. Con 0 non scende mai.
+# La cambia il menu della console; se manca vale 480000.
+CPU_IDLE=480000
+
+# Vecchio nome, ancora valido: equivale a CPU_FREQ=1008000.
+# Vale solo se CPU_FREQ non e' impostata.
+#DONT_OVERCLOCK=1
+
+# --- Frequenza della GPU, in MHz -------------------------------------------
+# Il driver parte a 252. Salire e' terreno inesplorato: la tensione non viene
+# alzata, quindi immagine che sfarfalla e blocchi sono possibili.
+#GPU_FREQ=252
+
+# --- Clock della DRAM, in MHz ----------------------------------------------
+# Questa riga da sola NON cambia niente: la DRAM la fissa U-Boot prima di
+# Linux. Si cambia dal menu, che riscrive U-Boot sulla scheda e chiede il
+# riavvio. Qui resta scritto solo per ricordare cosa e' stato applicato.
+# I file stanno in sys/uboot/: 624 (normale), 504, 480, 408, e in
+# overclock 648, 672, 696, 720. Sopra 624 la tensione NON viene alzata: una
+# DRAM instabile non rallenta, corrompe la memoria. Si prova col file
+# "memtest" nella radice della scheda, non giocando.
+#DRAM_CLK=624
+
+# --- Secondo pulsante di fuoco: NON FUNZIONA, riga ignorata ----------------
+# Sulle porte della console il secondo pulsante non arriva mai: lo abbiamo
+# misurato leggendo quello che trasmette il microcontrollore. In compenso
+# accenderlo SPEGNE LE PADDLE (le stesse linee fisiche: o manopola o contatto).
+# Adesso la console lo azzera sempre all'avvio, qualunque cosa ci sia scritto.
+# Chi vuole due pulsanti usi un pad USB, che li ha davvero.
+SECOND_BUTTON=0
+
+# --- Banco di prova --------------------------------------------------------
+# Con un numero maggiore di zero, all'avvio di ogni ROM la console emula
+# quel numero di fotogrammi a tutta velocita' e scrive a video quanti ne ha
+# fatti al secondo. Serve a confrontare compilazioni e frequenze diverse
+# MISURANDO invece di dedurre. 600 e' un buon valore: dura pochi secondi.
+# Da rimettere a 0 (o togliere) quando si e' finito.
+#BENCH=600
+
+# --- Dump delle cartucce ---------------------------------------------------
+# Salva la ROM letta dalla cartuccia sulla microSD invece che in memoria.
+#DUMP_TO_SD=1
+
+# --- Modalita' sviluppatore (serve il file "developer" nella radice) -------
+# Password di root per l'accesso SSH.
+#PASSWORD=whyNotFrye
+# Aspetta che compaia l'adattatore USB-ethernet invece di attendere 5 secondi.
+#WAIT_FOR_ETH0=1
