@@ -403,8 +403,9 @@ In order of what your effort buys you:
 Use the on-screen temperature readout to judge your own changes: switch it on
 from the Commands menu, play for a quarter of an hour, and note the **highest**
 figure you see, not the one at the end. Every degree you remove is a degree of
-distance from the 75 °C step described above — and below that line your clock
-setting is yours, not the thermal governor's.
+distance from the 75 °C step described above — and below that line the console
+runs at the speed you selected, instead of the 912 MHz that thermal throttling
+imposes.
 
 ---
 
@@ -422,7 +423,8 @@ setting is yours, not the thermal governor's.
   contents arrive through a microcontroller at 115200 baud, roughly one byte
   every 87 µs against the 838 ns of a real 2600. Nothing in software can change
   this.
-* **The CPU clock is not yours above 75 °C** — see
+* **From 75 °C the console throttles itself.** It drops the CPU to 912 MHz on
+  its own, whatever you selected in the menu — see
   [Thermal throttling](#thermal-throttling).
 * USB devices (2600-daptor, USB-to-serial dongles) may still cause slowdowns in
   ARM-based games, as in the previous firmware.
