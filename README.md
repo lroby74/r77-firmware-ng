@@ -507,8 +507,24 @@ files.
   the Stella 6 firmware this fork is built on.
 * **Remowilliams**, for the original AtariAge community build.
 * **Hyperkin**, for publishing the original source drop.
+* **[Claude Code](https://claude.com/claude-code) (Max plan), used inside VS
+  Code**, which wrote the code in this fork.
 
 Licensing follows the upstream projects; Stella is GPL v2.
+
+### On the use of AI
+
+Stated here so that nobody has to ask, and so that nobody has to pretend:
+**this work was done with an AI assistant, and it could not have been done
+without one.** Claude Code wrote the code; the work was directed, argued with,
+and checked by a human throughout.
+
+What that does *not* mean is that any of it was taken on trust. Every figure in
+this document — every temperature, every frame rate, every clock that turned
+out not to be stable — was measured on a physical RetroN 77, on the bench, and
+several confident-sounding theories died there. Where a claim rests on a
+measurement, the measurement is described so you can repeat it. Where something
+was not measured, it says so.
 
 ---
 
