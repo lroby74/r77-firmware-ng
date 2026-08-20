@@ -241,6 +241,12 @@ Two consequences, both tested rather than assumed:
 If you play the demanding classics and cannot add cooling, this is the reason to
 pick 1008 MHz despite the voltage argument above.
 
+**Stella 7.0 does not fix this.** Retested at 912 MHz on 7.0: identical. The
+speed-ups in 7.0 are concentrated in the ARM cartridge interpreter, and
+Battlezone is a plain cartridge that never touches it — what is left over for
+the TIA is not enough to lift the frame rate over 60. So this section applies to
+7.0 exactly as it did to 6.7.1.
+
 **Avoid 1200 MHz — this is the firmest recommendation in this document.** It is
 the highest entry in the board's own frequency table, with no margin left above
 it, and consoles lock up there.
