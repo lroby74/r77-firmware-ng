@@ -1,9 +1,15 @@
 # RetroN 77 HD firmware
 
-A firmware image for the Hyperkin RetroN 77 built around **Stella 6.7.1**, with a
+A firmware image for the Hyperkin RetroN 77 built around **Stella 7.0**, with a
 set of console-side additions that are not available anywhere else: a live
 overclock/underclock menu, an on-screen SoC temperature readout, a self-expanding
 SD card image, and three real emulation bugs fixed.
+
+As far as we can tell this is the **first build of Stella 7.0 that runs on a
+RetroN 77**. Stella ships a RetroN 77 target, but it had evidently not been
+compiled for some time: one of its own source files no longer matched the class
+it implements, so the 7.0 tree does not build for this console until that is
+corrected. The one-line fix is in this fork and is described below.
 
 This is a fork of [DirtyHairy's `r77-firmware-ng`](https://github.com/DirtyHairy/r77-firmware-ng),
 which was based on Stella 6.6. Everything listed under
@@ -63,13 +69,33 @@ everything — your games and settings stay where they are.
 
 ### Emulator
 
-Built on **Stella 6.7.1**. The previous firmware shipped Stella 6.6.
+Built on **Stella 7.0**. The previous release of this firmware shipped 6.7.1;
+DirtyHairy's shipped 6.6.
+
+Stella 7.0's changelog claims *"accelerated emulation up to ~15% (ARM)"*. On this
+console the effect is visible without needing a benchmark: same console, same
+games, same clock settings, and it runs **measurably cooler** than under 6.7.1.
+A 1200 MHz setting that used to lock up within a couple of minutes now survives
+around twenty. It still locks up eventually, so the recommendation below has not
+changed — but the machine is plainly doing less work for the same result.
+
+The upstream gains are in the places that matter here: the ARM interpreter that
+every Champ Games, DPC+, CDF and CDFJ cartridge runs on, and the per-pixel TIA
+sprite code and audio channel generator, which are busy in *every* title.
+
+**One upstream fix was needed to get this far.** `OSystemR77.cxx` still declared
+`getBaseDirectories()` with the old parameter type, so it no longer overrode the
+base class method and the compiler rejected the file outright. One line, and
+without it the RetroN 77 target of Stella 7.0 does not compile at all.
 
 ### Emulation bugs fixed
 
 Three defects that affect what you actually see on screen. All three were
 verified by comparing detection results across a large ROM set before and after
 the change.
+
+> The 128 KB Turbo Arcade detection bug, fixed by hand in the 6.7.1 release of
+> this firmware, is **fixed upstream in 7.0** and no longer needs a patch here.
 
 * **QuadTari + SaveKey are no longer mutually exclusive.**
   Controller auto-detection tested for a SaveKey *before* testing for a QuadTari,
@@ -79,11 +105,19 @@ the change.
   `Joystick + SaveKey`. Measured across 78 ROMs: 17 changed behaviour,
   61 were untouched.
 
-* **Turbo Arcade (128 KB) is detected correctly.**
-  The 128 KB branch of the cartridge detector tested for the 3F format before
-  CDF, so a CDF cartridge of that size was misidentified and refused to load.
-  The 128 KB branch now mirrors the 64 KB one. (Same shape of defect as the
-  QuadTari bug: a test in the wrong order.)
+* **A joystick is no longer mistaken for a paddle in QuadTari games.**
+  New in Stella 7.0: the emulator now works out what is plugged *into* the
+  QuadTari, and when no signature matches it assumes paddles. Champ Games
+  titles read the fire button from the cartridge's own ARM code rather than
+  from the 6507, so that detection never matches and they all ended up as
+  paddles — the joystick simply did not steer. The assumption is now skipped
+  when the ROM reads the joystick directions. Measured across 925 ROMs: 22 use
+  a QuadTari, **5 were wrong and are now right, none changed for the worse**
+  (Galagon, rubyQ, Wizard of Wor Arcade, Turbo Arcade demo).
+
+  This one is a defect in Stella 7.0 itself rather than in this firmware.
+  Stella 6.7.1 is not affected — it never detected the
+  QuadTari's sub-controllers at all.
 
 * **Developer mode can no longer break every ARM game.**
   Turning on Stella's *Developer* settings enabled a fatal trap in the ARM
@@ -109,6 +143,10 @@ These are the real steps in the kernel's frequency table, not arbitrary numbers.
   is nothing to emulate, and restores your chosen speed the moment a game
   starts. It never goes *above* your game setting. This keeps the console
   noticeably cooler while it sits idle.
+* **The GPU drops with it.** While the same setting is active, the GPU also
+  falls to its lowest step, 168 MHz, and returns to your chosen frequency when
+  a game starts. Menus and the launcher have nothing to draw that needs more.
+  Like the CPU, it never goes above what you selected.
 * **The GPU knob did not exist before.** The compiled Mali driver hard-codes
   252 MHz and exposes no control at all; this firmware adds a `sysfs` entry to
   the driver so the frequency can be changed at runtime.
@@ -205,12 +243,25 @@ pick 1008 MHz despite the voltage argument above.
 
 **Avoid 1200 MHz — this is the firmest recommendation in this document.** It is
 the highest entry in the board's own frequency table, with no margin left above
-it, and consoles lock up there. The important detail, measured: **it freezes
-even when the SoC is cool**, with copper heatsinks and a fan fitted, idle as
-well as under load. That rules out heat as the cause — it is simply beyond what
-this silicon does reliably at the voltage available, and no amount of cooling
-will change it. The previous firmware shipped 1.2 GHz as its default; this one
-does not, for exactly that reason.
+it, and consoles lock up there.
+
+Stella 7.0 made this test much more interesting, because it runs cool enough
+that 1200 MHz becomes *usable* for a while. It was measured again on a console
+modified about as far as this one can sensibly be modified — copper heatsinks
+replacing every aluminium one, a fan strapped underneath, and the lid left off
+permanently so the fan reaches the whole board:
+
+| Conditions | Result |
+|---|---|
+| Fan off, temperature climbing slowly | reached **70 °C**, then froze |
+| Fan on, **58 °C rock steady** for 23 minutes | froze anyway |
+
+The second line is the one that settles it. **The console froze at a
+temperature it had been holding without effort**, on the most heavily cooled
+setup available. That rules out heat: 1200 MHz is simply beyond what this
+silicon does reliably at the voltage available, and no amount of cooling will
+change it. The previous firmware shipped 1.2 GHz as its default; this one does
+not, for exactly that reason.
 
 If you want the extra speed, the way to get it is airflow at 1104 MHz, not the
 next step up.
@@ -282,8 +333,8 @@ The image is 48 MB and grows to the size of your card on first boot.
   up at 1.2 GHz. See [What to actually set](#what-to-actually-set). If you really
   want the old behaviour, edit `sys/settings` on the card and comment the
   `CPU_FREQ` line out.
-* **In the menus the CPU drops to 480 MHz** and returns to your setting the
-  moment a game starts.
+* **In the menus the CPU drops to 480 MHz and the GPU to 168 MHz**, and both
+  return to your settings the moment a game starts.
 * GPU stays at its 252 MHz boot value and DRAM at 624 MHz until you change them.
 
 ### Extras for tinkerers
@@ -457,7 +508,49 @@ Licensing follows the upstream projects; Stella is GPL v2.
 
 ## Building
 
-The upstream build instructions still apply. Three things are worth writing down.
+The upstream build instructions still apply, but **building Stella 7.0 for this
+console needs five things that nothing tells you about**, plus the compiler
+being newer than the one this firmware normally uses. They are listed first,
+because without them the build either fails or produces a binary that does not
+start on the console.
+
+**1. GCC 13 or newer is required.** Stella 7.0 uses `using enum`, a C++20
+feature the shipped GCC 10 does not implement, and `ostringstream::view()`,
+which needs libstdc++ 11. The Arm GNU Toolchain 13.3 (`arm-none-linux-gnueabihf`)
+works. Everything below is a consequence of using a newer compiler against the
+console's much older system libraries.
+
+**2. Build against the old sysroot, not the new toolchain's.** The console runs
+glibc 2.33. Pass `--sysroot` pointing at the *original* toolchain's libc, or the
+binary will ask for symbols the console does not have and die at startup with no
+message.
+
+**3. Disable the new toolchain's fixed `pthread.h`.** GCC 13 ships a "corrected"
+copy built for glibc 2.38, which includes a header that does not exist in 2.33.
+Rename `lib/gcc/arm-none-linux-gnueabihf/13.3.1/include-fixed/pthread.h` out of
+the way; the sysroot's own header is the right one.
+
+**4. Link libstdc++ statically.** GCC 13's C++ library needs symbol versions the
+console's libstdc++ does not provide. Add `-static-libstdc++ -static-libgcc`
+**to `LDFLAGS`**. Note that 7.0's `config.mak` writes `LDFLAGS +=`, not
+`LDFLAGS :=` — a substitution written for the older file silently does nothing,
+and the failure only shows up as a pile of undefined `GLIBC_2.34` symbols much
+later.
+
+**5. Two glibc functions have to be supplied by hand.** GCC 13's headers route
+`strtoul` to `__isoc23_strtoul`, and 7.0 calls `arc4random`; neither exists in
+glibc 2.33. A dozen lines forwarding them to `strtoul` and `getrandom` are
+enough, linked in through `LIBS`.
+
+**Verify the result before copying it to a card.** Two checks, both of which
+must pass, or the console shows a black screen and tells you nothing:
+
+```
+readelf -d  stella | grep libstdc++          # must print nothing
+readelf -sW stella | grep -oE 'GLIBC_2\.[0-9]+' | sort -uV | tail -1   # must not exceed 2.33
+```
+
+Three further things are worth writing down.
 
 **Do *not* build with `make RELEASE=1`.** That option enables profile-guided
 optimisation, and on this hardware **it makes Stella slower**. Measured on the
@@ -478,14 +571,15 @@ leaving **225 source files with no profile data at all** — which `-fprofile-us
 then treats as cold. The PGO binary is also 16% larger, which a 32 KB L1
 instruction cache does not appreciate.
 
-The released image is therefore built with a plain `make`. If you want to try
+Those figures were measured on the 6.7.1 build; nothing about 7.0 changes the
+reasoning. The released image is therefore built with a plain `make`. If you want to try
 PGO anyway, note that the profiling step needs a working `qemu-user`: under
 WSL 1 it cannot map the guest address space at all and the build dies there;
 WSL 2, ordinary Linux, or the upstream Docker container are fine.
 
-**Stella 6.7.1 removed `src/sqlite` from its core module list**, so it has to be
+**Stella still leaves `src/sqlite` out of its core module list**, so it has to be
 added back in `app/stella/config/config.mak` or the link fails on about thirty
-`sqlite3_*` symbols.
+`sqlite3_*` symbols. Unchanged since 6.7.1.
 
 **If you change the architecture flags, change them in `LDFLAGS` too.** With
 `-flto` most code generation happens at link time, so mixing `-mcpu=cortex-a7` in
