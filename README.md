@@ -512,6 +512,28 @@ files.
 
 Licensing follows the upstream projects; Stella is GPL v2.
 
+### Source code
+
+This firmware ships **Stella**, which is GPL v2, so the source it was built from
+has to travel with it. It is in two places, either of which is complete:
+
+* **[lroby74/stella, branch `retron77-hd-70`](https://github.com/lroby74/stella/tree/retron77-hd-70)**
+  — commit `8da10ba`, the exact tree this release was compiled from. Diffing it
+  against upstream's `7.0` tag shows every change, and nothing else.
+  The 6.7.1 release was built from branch
+  [`retron77-hd`](https://github.com/lroby74/stella/tree/retron77-hd), commit
+  `70b2560`.
+* **Attached to each release** as `stella-source-<version>-retron77-hd.zip`, so
+  that a downloaded release is self-contained without needing to clone anything.
+
+> **Why the extra archive:** GitHub's automatically generated *"Source code
+> (zip)"* on a release **does not include the contents of submodules**, and
+> Stella is a submodule here. Downloading that archive alone gives you an empty
+> `app/stella/stella/` directory. Thanks to Thomas Jentzsch for spotting it.
+
+The rest of the tree — the kernel, U-Boot, BusyBox and the console-side code —
+is in this repository in full.
+
 ### On the use of AI
 
 Stated here so that nobody has to ask, and so that nobody has to pretend:
