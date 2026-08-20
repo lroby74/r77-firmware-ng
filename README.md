@@ -526,6 +526,35 @@ several confident-sounding theories died there. Where a claim rests on a
 measurement, the measurement is described so you can repeat it. Where something
 was not measured, it says so.
 
+**"We tried AI and the results were a disaster."** That objection is nearly
+always about a chat window: you paste a file in, you get a file back, and
+nobody ever runs it. This was not made that way. The assistant worked inside
+the editor with a shell of its own: it drove the cross-compiler, read a 3.4
+kernel and a decade-old vendor tree, wrote its own test harnesses, and was
+regularly told it was wrong and sent back to measure.
+
+**"AI code is unmaintainable."** Do not take a position on that from this
+paragraph — read the diff instead. Every non-obvious change carries a comment
+explaining *why* it is there and what happens without it, patches that are ours
+rather than upstream's say so in the code itself, and each commit does one
+thing and explains it. The reasoning that produced a change is written down
+next to the change, which is more than can be said for a good deal of
+hand-written firmware.
+
+The evidence that this was not a machine agreeing with itself is that the
+failures are published too. Profile-guided optimisation made the emulator
+*slower* here, and the table proving it is in the Building section. Copper
+heatsinks did not stop the thermal throttling. 1200 MHz froze at a rock-steady
+58 °C with a fan running. Something that only produced plausible-looking output
+would have reported success on all three.
+
+A note from the author: this was not the first attempt. Something like a dozen
+assistants were tried before this one, and what made the difference was not the
+model on its own but the arrangement — Claude Code, on the Max plan, running
+inside VS Code, with access to the machine that does the building. An assistant
+that can only *talk* about code behaves very differently from one that can
+compile it, run it, and be proved wrong by a console sitting on the desk.
+
 ---
 
 ## Building
