@@ -125,6 +125,38 @@ the change.
   stops **every** ARM-based title (all of the Champ Games catalogue, DPC+, CDF,
   CDFJ) from starting at all. Developer mode is now forced off on the RetroN 77.
 
+### ROM launcher and menus
+
+* **"Recently Played" and "Most Popular" no longer disappear.** They showed up
+  when the console was switched on and then vanished, seemingly after playing a
+  game. The real trigger was walking back up from a subdirectory: Stella 7.0
+  decides whether to show those folders by comparing the *display name* of the
+  current directory with the start ROM directory, and a directory name keeps
+  its trailing separator or not depending on how the node was built —
+  `/mnt/games` reads back as `games`, while the same directory reached with
+  `..` reads back as `games/`. The two never matched again until the next
+  restart. Anyone who keeps ROMs in subfolders hit this on every session.
+
+  This one is a defect in Stella 7.0 itself. It was introduced upstream in
+  January 2024 by the fix for issue #1011, which replaced a path comparison
+  with a node comparison; 6.7.1 is not affected. Here the comparison is back on
+  the paths, which keeps that fix working too.
+
+* **The About and What's New screens no longer cut their text.** What's New
+  wrapped its lines at a fixed 64 characters no matter how wide the dialog
+  actually was, and the dialog is clamped to its parent — so on this console
+  several lines were drawn past the right edge and simply lost. The wrapping
+  now follows the width the dialog really got, and both screens use a slightly
+  smaller font on the RetroN 77, which lets About hold 64 characters in about
+  the same physical width.
+
+* **Game snapshots are shown again in the launcher.** Stella 7.0 renamed the
+  build flag that enables image loading (`PNG_SUPPORT` became `IMAGE_SUPPORT`)
+  and moved third-party code into new directories. The build configuration
+  still used the old names, so the emulator compiled and ran but answered
+  *"Image loading not supported"* where the snapshot belongs — and ZIP support
+  was silently missing too. Both are back.
+
 ### New: "OC settings" menu
 
 Reachable from the options menu (it is present in both the basic and the
@@ -134,7 +166,7 @@ advanced settings screens).
 |---|---|---|
 | **CPU** | 1200 (OC) · 1104 · 1008 · 912 (UC) | immediately |
 | **CPU in menus** | 480 · 600 · 648 MHz · same as game | immediately |
-| **GPU** | 168 (UC) · 252 (std) · 312 · 384 · 456 | immediately |
+| **GPU** | 168 (UC) · 252 (std) · 312 · 384 · 456 · 528 (OC) · 576 (OC) | immediately |
 | **DRAM** | 408 · 480 · 504 · 624 (std) · 648 · 672 · 696 · 720 (OC) | on reboot |
 
 These are the real steps in the kernel's frequency table, not arbitrary numbers.
@@ -150,6 +182,13 @@ These are the real steps in the kernel's frequency table, not arbitrary numbers.
 * **The GPU knob did not exist before.** The compiled Mali driver hard-codes
   252 MHz and exposes no control at all; this firmware adds a `sysfs` entry to
   the driver so the frequency can be changed at runtime.
+* **528 and 576 MHz are above the vendor table.** The board's own DVFS table
+  stops at 456 MHz, which is why the two higher steps are marked (OC). They are
+  not arbitrary: both are exact entries of the GPU PLL table, the boot
+  configuration already prepares the PLL for 576, and Allwinner rates this
+  Mali-400 MP2 at up to 600 MHz. As with the DRAM, the voltage is not raised —
+  all three vendor steps sit at 1.2 V, so above 456 the frequency goes up on
+  its own.
 * **The DRAM clock is set by U-Boot, not by Linux.** Changing it rewrites the
   U-Boot SPL on the card (at the 8 KiB offset, with read-back verification) and
   takes effect on the next boot. All eight variants ship inside the image.
@@ -188,7 +227,7 @@ worrying about it.
 | Other settings | Recommended |
 |---|---|
 | **CPU in menus** | 480 MHz |
-| **GPU** | 252 MHz (the boot value) is fine for everything; raise it only if you have airflow |
+| **GPU** | **312 MHz**, or higher if you have airflow. Raising it is not only a heat question: emulation does not use the GPU, but *presentation* does — every frame is scaled to the output resolution — and with the CPU at 912 MHz, raising the GPU has been measured to make a game run better. Above 456 MHz you are past the vendor table |
 | **DRAM** | **624 MHz** unless you have validated higher — see the DRAM note below |
 
 **Why 912 MHz if you cannot improve the cooling.** It runs at a lower core
