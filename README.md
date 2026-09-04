@@ -150,6 +150,28 @@ the change.
   smaller font on the RetroN 77, which lets About hold 64 characters in about
   the same physical width.
 
+* **Every "browse for a folder" button was fatal.** Selecting *Bezel path...*
+  killed the emulator outright: the picture froze and the console had to be
+  switched off at the mains. The same was true of *Snapshot path*, the ROM
+  directory, the ROM info image directory, ROM audit, save log, export
+  properties and select bezel image - eight buttons in all.
+
+  The file browser starts by making its path bar visible, and that code
+  touched the five widgets of the full path bar without checking which
+  interface is running. The RetroN 77 runs Stella's *minimal UI*, where those
+  five are never created - a single text field is built instead - so the first
+  call dereferenced a null pointer, before anything could be drawn. Nothing
+  restarts Stella on this console, hence the frozen picture.
+
+  It could not be reproduced on a desktop build, because no desktop build runs
+  the minimal UI. Reproduced here by running the desktop build with the
+  minimal UI forced on, confirmed with a backtrace, and then verified fixed the
+  same way; the normal interface is byte-for-byte unaffected.
+
+  While fixing it: in the same function, the calls that re-enable the path bar
+  after it has been hidden were all aimed at the *first* button, so Previous,
+  Next and Up stayed disabled. Corrected too.
+
 * **The Help screen shows the RetroN 77's own controls again.** Stella already
   ships a console-specific help screen listing the joystick buttons and the
   console switches, and the basic settings screen used it — but the advanced
