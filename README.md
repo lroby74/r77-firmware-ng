@@ -127,70 +127,36 @@ the change.
 
 ### ROM launcher and menus
 
-* **"Recently Played" and "Most Popular" no longer disappear.** They showed up
-  when the console was switched on and then vanished, seemingly after playing a
-  game. The real trigger was walking back up from a subdirectory: Stella 7.0
-  decides whether to show those folders by comparing the *display name* of the
-  current directory with the start ROM directory, and a directory name keeps
-  its trailing separator or not depending on how the node was built —
-  `/mnt/games` reads back as `games`, while the same directory reached with
-  `..` reads back as `games/`. The two never matched again until the next
-  restart. Anyone who keeps ROMs in subfolders hit this on every session.
+Six things that were wrong on screen, and what happens now.
 
-  This one is a defect in Stella 7.0 itself. It was introduced upstream in
-  January 2024 by the fix for issue #1011, which replaced a path comparison
-  with a node comparison; 6.7.1 is not affected. Here the comparison is back on
-  the paths, which keeps that fix working too.
+* **"Recently Played" and "Most Popular" kept disappearing.** They were there
+  when you switched the console on, and gone later — which made it look like
+  playing a game had removed them. It didn't: they went away as soon as you
+  came back up out of a folder. If you keep your games in folders, that meant
+  every session. They stay put now.
 
-* **The About and What's New screens no longer cut their text.** What's New
-  wrapped its lines at a fixed 64 characters no matter how wide the dialog
-  actually was, and the dialog is clamped to its parent — so on this console
-  several lines were drawn past the right edge and simply lost. The wrapping
-  now follows the width the dialog really got, and both screens use a slightly
-  smaller font on the RetroN 77, which lets About hold 64 characters in about
-  the same physical width.
+* **Selecting a folder froze the console.** *Bezel path...* in the Video &
+  Audio settings locked the machine solid — no button did anything and the only
+  way out was to pull the power. Seven other buttons did the same thing:
+  snapshot path, ROM folder, ROM picture folder, ROM audit, save log, export
+  game properties, choose bezel image. All eight work now.
 
-* **Every "browse for a folder" button was fatal.** Selecting *Bezel path...*
-  killed the emulator outright: the picture froze and the console had to be
-  switched off at the mains. The same was true of *Snapshot path*, the ROM
-  directory, the ROM info image directory, ROM audit, save log, export
-  properties and select bezel image - eight buttons in all.
+* **The Bezels page ignored the joystick.** Nothing on that page could be
+  selected, and you could not even reach OK or Cancel to leave it. It behaves
+  like the other pages now.
 
-  The file browser starts by making its path bar visible, and that code
-  touched the five widgets of the full path bar without checking which
-  interface is running. The RetroN 77 runs Stella's *minimal UI*, where those
-  five are never created - a single text field is built instead - so the first
-  call dereferenced a null pointer, before anything could be drawn. Nothing
-  restarts Stella on this console, hence the frozen picture.
+* **Help showed the wrong controls.** Opening Help from the advanced settings
+  brought up the PC list — Ctrl+Q, Alt+Return, how to resize a window — none of
+  which exists on a RetroN 77. It now shows the console's own page, with the
+  joystick buttons and the switches, whichever menu you come from.
 
-  It could not be reproduced on a desktop build, because no desktop build runs
-  the minimal UI. Reproduced here by running the desktop build with the
-  minimal UI forced on, confirmed with a backtrace, and then verified fixed the
-  same way; the normal interface is byte-for-byte unaffected.
+* **Text ran off the edge in About and What's New.** Whole line endings were
+  missing. The text now fits, in a slightly smaller size.
 
-  While fixing it: in the same function, the calls that re-enable the path bar
-  after it has been hidden were all aimed at the *first* button, so Previous,
-  Next and Up stayed disabled. Corrected too.
-
-* **The Help screen shows the RetroN 77's own controls again.** Stella already
-  ships a console-specific help screen listing the joystick buttons and the
-  console switches, and the basic settings screen used it — but the advanced
-  options screen always opened the desktop one, which explains `Ctrl+Q`,
-  `Alt+Return` and how to resize the window. The same "Help" entry gave you
-  different, and useless, text depending on which menu you reached it from.
-
-* **The Bezels tab can be used with the joystick.** That tab was built without
-  ever being added to the dialog's focus list — the only one of the five that
-  was missing the call. With no focusable widget on it, the stick moved nothing
-  at all, and you could not even reach OK or Cancel to get out, because the
-  button group is reached *through* the tab's focus list.
-
-* **Game snapshots are shown again in the launcher.** Stella 7.0 renamed the
-  build flag that enables image loading (`PNG_SUPPORT` became `IMAGE_SUPPORT`)
-  and moved third-party code into new directories. The build configuration
-  still used the old names, so the emulator compiled and ran but answered
-  *"Image loading not supported"* where the snapshot belongs — and ZIP support
-  was silently missing too. Both are back.
+* **Game pictures came back in the ROM list.** Where the snapshot should have
+  been, the launcher said *"Image loading not supported"*, even though the
+  picture files were on the card. Games inside ZIP files could not be opened
+  either. Both work again.
 
 ### New: "OC settings" menu
 
