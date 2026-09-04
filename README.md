@@ -150,6 +150,19 @@ the change.
   smaller font on the RetroN 77, which lets About hold 64 characters in about
   the same physical width.
 
+* **The Help screen shows the RetroN 77's own controls again.** Stella already
+  ships a console-specific help screen listing the joystick buttons and the
+  console switches, and the basic settings screen used it — but the advanced
+  options screen always opened the desktop one, which explains `Ctrl+Q`,
+  `Alt+Return` and how to resize the window. The same "Help" entry gave you
+  different, and useless, text depending on which menu you reached it from.
+
+* **The Bezels tab can be used with the joystick.** That tab was built without
+  ever being added to the dialog's focus list — the only one of the five that
+  was missing the call. With no focusable widget on it, the stick moved nothing
+  at all, and you could not even reach OK or Cancel to get out, because the
+  button group is reached *through* the tab's focus list.
+
 * **Game snapshots are shown again in the launcher.** Stella 7.0 renamed the
   build flag that enables image loading (`PNG_SUPPORT` became `IMAGE_SUPPORT`)
   and moved third-party code into new directories. The build configuration
